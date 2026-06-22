@@ -2,7 +2,11 @@ fastapi
 uvicorn[standard]
 python-jose[cryptography]
 passlib[bcrypt]
-pydantic
+pydantic[email]
 sqlalchemy
+asyncpg
 python-multipart
+python-dotenv
 langgraph
+greenlet
+bcrypt==4.0.1
