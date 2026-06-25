@@ -27,7 +27,7 @@ async def create_run(
     )
 
 
-async def get_run(run_id: int, db: AsyncSession) -> AgentCreateRunResponse | None:
+async def get_run_by_id(run_id: int, db: AsyncSession) -> AgentCreateRunResponse | None:
     result = await db.execute(select(Job).where(Job.run_id == run_id))
     job = result.scalar_one_or_none()
     if job is None:
@@ -40,3 +40,22 @@ async def get_run(run_id: int, db: AsyncSession) -> AgentCreateRunResponse | Non
         result=job.result,
         error=job.error,
     )
+
+
+async def list_runs(user_id: int, db: AsyncSession) -> list[AgentCreateRunResponse]:
+    result = await db.execute(
+        select(Job)
+        .where(Job.user_id == user_id)
+        .order_by(Job.run_id.desc())
+    )
+    return [
+        AgentCreateRunResponse(
+            run_id=job.run_id,
+            user_id=job.user_id,
+            input_text=job.input_text,
+            status=job.status,
+            result=job.result,
+            error=job.error,
+        )
+        for job in result.scalars().all()
+    ]

@@ -8,11 +8,11 @@ CREATE TABLE users (
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
-CREATE TABLE job(
+CREATE TABLE agent_runs(
     run_id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL Foreign Key REFERENCES users(user_id),
+    user_id INT NOT NULL REFERENCES users(user_id),
     input_text TEXT NOT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'not_started',
+    status VARCHAR(50) NOT NULL DEFAULT 'pending',
     result TEXT,
     error TEXT,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,

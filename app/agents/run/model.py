@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from typing import Optional
 
 from pydantic import BaseModel
-from sqlalchemy import DateTime, Integer, String
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.api.auth.models import Base
@@ -22,14 +22,24 @@ class AgentCreateRunResponse(BaseModel):
 
 
 class Job(Base):
-    __tablename__ = "job"
+    __tablename__ = "agent_runs"
 
     run_id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
-    input_text: Mapped[str] = mapped_column(String, nullable=False)
-    status: Mapped[str] = mapped_column(String(50), nullable=False, default="pending")
-    result: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    error: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.user_id"),
+        index=True,
+        nullable=False,
+    )
+    input_text: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="pending",
+        server_default="pending",
+    )
+    result: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
