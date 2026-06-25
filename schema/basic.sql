@@ -8,3 +8,13 @@ CREATE TABLE users (
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE job(
+    run_id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL Foreign Key REFERENCES users(user_id),
+    input_text TEXT NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'not_started',
+    result TEXT,
+    error TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);

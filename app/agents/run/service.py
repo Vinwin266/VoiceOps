@@ -1,0 +1,42 @@
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.agents.run.model import AgentCreateRunResponse, Job
+
+
+async def create_run(
+    user_id: int,
+    input_text: str,
+    db: AsyncSession,
+) -> AgentCreateRunResponse:
+    job = Job(
+        user_id=user_id,
+        input_text=input_text,
+        status="pending",
+    )
+    db.add(job)
+    await db.commit()
+    await db.refresh(job)
+    return AgentCreateRunResponse(
+        run_id=job.run_id,
+        user_id=job.user_id,
+        input_text=job.input_text,
+        status=job.status,
+        result=job.result,
+        error=job.error,
+    )
+
+
+async def get_run(run_id: int, db: AsyncSession) -> AgentCreateRunResponse | None:
+    result = await db.execute(select(Job).where(Job.run_id == run_id))
+    job = result.scalar_one_or_none()
+    if job is None:
+        return None
+    return AgentCreateRunResponse(
+        run_id=job.run_id,
+        user_id=job.user_id,
+        input_text=job.input_text,
+        status=job.status,
+        result=job.result,
+        error=job.error,
+    )

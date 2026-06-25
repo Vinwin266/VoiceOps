@@ -17,3 +17,4 @@ async def get_db():
 
 async def close_db(db: AsyncSession):
     await db.close()
+
