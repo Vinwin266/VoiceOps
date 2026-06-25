@@ -26,10 +26,11 @@ async def run_agent(
 @router.get("/run/{run_id}", response_model=AgentCreateRunResponse)
 async def get_run(
     run_id: int,
+    current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
     agent_run = await get_run_by_id(run_id=run_id, db=db)
-    if agent_run is None:
+    if agent_run is None or agent_run.user_id != current_user.user_id:
         raise HTTPException(status_code=404, detail="Run not found")
     return agent_run
 
