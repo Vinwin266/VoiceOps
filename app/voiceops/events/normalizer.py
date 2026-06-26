@@ -1,8 +1,9 @@
 import hashlib
 import re
+from typing import Any
 
 from app.voiceops.events.model import VoiceOpsEvent
-from app.voiceops.taxonomy import infer_event_taxonomy
+from app.voiceops.taxonomy import canonicalize_source_module, infer_event_taxonomy
 
 
 def normalize_logs(raw_text: str, run_id: int | None = None) -> list[VoiceOpsEvent]:
@@ -13,29 +14,62 @@ def normalize_logs(raw_text: str, run_id: int | None = None) -> list[VoiceOpsEve
     event_messages = _group_multiline_events(lines)
 
     return [
-        _build_event(run_id=run_id, index=index, message=message)
+        build_voiceops_event(run_id=run_id, index=index, raw_message=message)
         for index, message in enumerate(event_messages, start=1)
     ]
 
 
-def _build_event(
-    run_id: int | None,
-    index: int,
-    message: str,
+def build_voiceops_event(
+    raw_message: str,
+    run_id: int | None = None,
+    index: int = 1,
+    event_id: str | None = None,
+    message_redacted: str | None = None,
+    **fields: Any,
 ) -> VoiceOpsEvent:
-    taxonomy = infer_event_taxonomy(message)
+    source_module = fields.get("source_module")
+    source_module_value = str(source_module) if source_module is not None else None
+    taxonomy = infer_event_taxonomy(raw_message)
+    canonical_module = (
+        fields.get("canonical_module")
+        or canonicalize_source_module(source_module_value)
+        or taxonomy.canonical_module
+    )
+    phase = fields.get("phase") or taxonomy.phase
+    pipeline_node = fields.get("pipeline_node") or taxonomy.pipeline_node
 
     return VoiceOpsEvent(
-        event_id=_event_id(run_id=run_id, index=index, message=message),
+        event_id=event_id or _event_id(run_id=run_id, index=index, message=raw_message),
         run_id=run_id,
-        level=_infer_level(message),
-        module=taxonomy.module,
-        phase=taxonomy.phase,
-        pipeline_node=taxonomy.pipeline_node,
+        timestamp=fields.get("timestamp"),
+        source_system=fields.get("source_system"),
+        source_module=source_module_value,
+        canonical_module=canonical_module,
+        level=fields.get("level") or _infer_level(raw_message),
+        module=canonical_module,
+        phase=phase,
+        pipeline_node=pipeline_node,
+        call_sid=fields.get("call_sid"),
+        provider_call_id=fields.get("provider_call_id"),
+        sip_call_id=fields.get("sip_call_id"),
+        room_id=fields.get("room_id"),
+        agent_id=fields.get("agent_id"),
+        participant_id=fields.get("participant_id"),
+        turn_id=fields.get("turn_id"),
+        provider=fields.get("provider"),
+        protocol=fields.get("protocol"),
+        direction=fields.get("direction"),
+        from_number=fields.get("from_number"),
+        to_number=fields.get("to_number"),
+        status_code=fields.get("status_code"),
+        hangup_cause=fields.get("hangup_cause"),
+        media_state=fields.get("media_state"),
+        latency_ms=fields.get("latency_ms"),
         taxonomy_confidence=taxonomy.confidence,
-        error_type=_infer_error_type(message),
-        message_redacted=redact_message(message),
-        raw_message=message,
+        error_type=fields.get("error_type") or _infer_error_type(raw_message),
+        message_redacted=message_redacted or redact_message(raw_message),
+        raw_message=raw_message,
+        fingerprint=fields.get("fingerprint"),
     )
 
 

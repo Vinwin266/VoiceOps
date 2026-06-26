@@ -13,6 +13,63 @@ class Runbook:
 
 
 RUNBOOKS: dict[str, Runbook] = {
+    "PROVIDER_WEBHOOK_FAILED": Runbook(
+        primary_root_cause="Telephony provider webhook failed before call lifecycle state could be updated.",
+        recommended_fix="Inspect provider webhook delivery, authentication, response status, and call_sid mapping.",
+        verification_plan=(
+            "Replay a provider webhook payload in a test environment.",
+            "Verify the endpoint returns a successful status code.",
+            "Confirm call_sid or provider_call_id maps to an internal call record.",
+        ),
+        summary="Telephony provider webhook failed during call ingress or status update.",
+        severity="high",
+        suspected_owner="telephony_provider_integration",
+        next_evidence_needed=(
+            "provider.",
+            "webhook payload id.",
+            "HTTP status code.",
+            "call_sid or provider_call_id.",
+            "handler logs and response body.",
+        ),
+    ),
+    "SIP_INVITE_FAILED": Runbook(
+        primary_root_cause="SIP INVITE failed before the call could reach the media/session layer.",
+        recommended_fix="Inspect SIP status code, trunk configuration, provider response, and INVITE routing.",
+        verification_plan=(
+            "Place a synthetic SIP call through the same trunk.",
+            "Verify INVITE reaches the expected endpoint.",
+            "Confirm provider status code and SIP Call-ID are captured.",
+        ),
+        summary="SIP INVITE failed before room/media setup.",
+        severity="high",
+        suspected_owner="sip_trunking",
+        next_evidence_needed=(
+            "SIP status code.",
+            "trunk_id.",
+            "provider response.",
+            "sip_call_id.",
+            "INVITE/ACK/BYE sequence.",
+        ),
+    ),
+    "PARTICIPANT_JOIN_TIMEOUT": Runbook(
+        primary_root_cause="Participant did not join the media room within the expected timeout.",
+        recommended_fix="Inspect room_id, participant_identity, dispatch_id, media bridge state, and provider leg status.",
+        verification_plan=(
+            "Run synthetic call into a test room.",
+            "Verify the participant joins within expected timeout.",
+            "Check media bridge and LiveKit room lifecycle logs.",
+        ),
+        summary="Participant join timed out during session orchestration.",
+        severity="high",
+        suspected_owner="session_orchestrator",
+        next_evidence_needed=(
+            "room_id.",
+            "participant_identity.",
+            "dispatch_id.",
+            "LiveKit room state.",
+            "SIP call_sid.",
+        ),
+    ),
     "LLM_DEPLOYMENT_NOT_FOUND": Runbook(
         primary_root_cause="Configured LLM deployment was not found.",
         recommended_fix="Audit the LLM deployment name and environment configuration.",

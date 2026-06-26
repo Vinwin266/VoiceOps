@@ -2,9 +2,7 @@ from sqlalchemy import select, update
 
 from app.agents.run.model import Job
 from app.api.db.session import AsyncSessionLocal
-from app.voiceops.events.normalizer import normalize_logs
-from app.voiceops.fingerprints.matcher import match_fingerprints
-from app.voiceops.rca.report_builder import build_rca_report
+from app.voiceops.analyzer import analyze_raw_text
 
 
 async def _run_agent(run_id: int) -> dict:
@@ -29,9 +27,7 @@ async def _run_agent(run_id: int) -> dict:
             )
             await db.commit()
 
-            events = normalize_logs(job.input_text, run_id=job.run_id)
-            matches = match_fingerprints(events)
-            rca_report = build_rca_report(events=events, matches=matches)
+            rca_report = analyze_raw_text(job.input_text, run_id=job.run_id)
             agent_result = rca_report.model_dump_json(indent=2)
 
             await db.execute(

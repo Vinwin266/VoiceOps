@@ -1,9 +1,14 @@
 import json
+import tempfile
 import unittest
 
+from app.voiceops.analyzer import analyze_jsonl
 from app.voiceops.events.normalizer import normalize_logs
 from app.voiceops.fingerprints.matcher import match_fingerprints
+from app.voiceops.graph.graph import run_rca_graph
 from app.voiceops.rca.report_builder import build_rca_report
+from app.voiceops.sinks.jsonl import append_events
+from app.voiceops.sources.jsonl import load_jsonl_events, parse_jsonl_events
 
 
 class VoiceOpsRCATest(unittest.TestCase):
@@ -28,6 +33,21 @@ class VoiceOpsRCATest(unittest.TestCase):
                 "TypeError: MockSession.say unexpected keyword allow_interruptions",
                 "SESSION_SAY_SIGNATURE_MISMATCH",
                 "tool/test_runtime",
+            ),
+            (
+                "SIP INVITE failed with status_code=503 trunk=primary",
+                "SIP_INVITE_FAILED",
+                "sip_invite",
+            ),
+            (
+                "provider webhook failed status_code=500 call_sid=CA123",
+                "PROVIDER_WEBHOOK_FAILED",
+                "provider_webhook",
+            ),
+            (
+                "participant failed to join room after timeout",
+                "PARTICIPANT_JOIN_TIMEOUT",
+                "participant_join",
             ),
         ]
 
@@ -71,15 +91,15 @@ class VoiceOpsRCATest(unittest.TestCase):
         self.assertIsNone(report.taxonomy_confidence)
 
     def test_unknown_classifiable_logs_use_inferred_phase(self) -> None:
-        events = normalize_logs("participant failed to join room after timeout", run_id=457)
+        events = normalize_logs("participant waiting to join room", run_id=457)
         matches = match_fingerprints(events)
         report = build_rca_report(events=events, matches=matches)
 
         self.assertEqual(report.primary_fingerprint, "UNKNOWN_VOICEOPS_FAILURE")
         self.assertEqual(report.phase, "participant_join")
-        self.assertEqual(report.module, "v1_entrypoint")
-        self.assertEqual(report.confidence, 0.45)
-        self.assertEqual(report.taxonomy_confidence, 0.45)
+        self.assertEqual(report.module, "session_orchestrator")
+        self.assertEqual(report.confidence, 0.4)
+        self.assertEqual(report.taxonomy_confidence, 0.4)
         self.assertEqual(report.primary_event_id, events[0].event_id)
         self.assertEqual(
             report.primary_root_cause,
@@ -95,9 +115,69 @@ class VoiceOpsRCATest(unittest.TestCase):
 
         self.assertEqual(report.primary_fingerprint, "UNKNOWN_VOICEOPS_FAILURE")
         self.assertEqual(report.phase, "llm")
-        self.assertEqual(report.module, "llm_provider")
+        self.assertEqual(report.module, "llm")
         self.assertEqual(report.primary_root_cause, "Unknown failure during LLM provider execution.")
         self.assertIn("model_or_deployment.", report.next_evidence_needed)
+
+    def test_source_module_maps_to_canonical_module(self) -> None:
+        raw_jsonl = json.dumps(
+            {
+                "raw_message": "participant waiting to join room",
+                "source_module": "my_app.v1_entrypoint",
+            }
+        )
+
+        events = parse_jsonl_events(raw_jsonl, run_id=459)
+
+        self.assertEqual(events[0].source_module, "my_app.v1_entrypoint")
+        self.assertEqual(events[0].canonical_module, "session_orchestrator")
+        self.assertEqual(events[0].module, "session_orchestrator")
+
+    def test_jsonl_sink_and_source_round_trip_events(self) -> None:
+        events = normalize_logs("SIP INVITE failed with status_code=503", run_id=460)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = f"{tmpdir}/events.jsonl"
+            append_events(events, path=path)
+            loaded_events = load_jsonl_events(path)
+
+        report = build_rca_report(
+            events=loaded_events,
+            matches=match_fingerprints(loaded_events),
+        )
+
+        self.assertEqual(len(loaded_events), 1)
+        self.assertEqual(loaded_events[0].event_id, events[0].event_id)
+        self.assertEqual(report.primary_fingerprint, "SIP_INVITE_FAILED")
+
+    def test_jsonl_analyzer_uses_same_rca_pipeline(self) -> None:
+        raw_jsonl = json.dumps(
+            {
+                "raw_message": "provider webhook failed status_code=500 call_sid=CA123",
+                "source_module": "twilio.webhook_handler",
+                "provider": "twilio",
+                "call_sid": "CA123",
+            }
+        )
+
+        report = analyze_jsonl(raw_jsonl, run_id=461)
+
+        self.assertEqual(report.primary_fingerprint, "PROVIDER_WEBHOOK_FAILED")
+        self.assertEqual(report.phase, "provider_webhook")
+        self.assertEqual(report.module, "telephony_provider")
+
+    def test_langgraph_wrapper_runs_deterministic_pipeline(self) -> None:
+        result = run_rca_graph(
+            {
+                "raw_input": "SIP INVITE failed with status_code=503 trunk=primary",
+                "run_id": 462,
+            }
+        )
+        report = result.get("report")
+
+        if report is None:
+            self.fail("RCA graph did not return a report")
+        self.assertEqual(report.primary_fingerprint, "SIP_INVITE_FAILED")
 
     def test_traceback_lines_are_grouped_into_one_event(self) -> None:
         raw_log = """

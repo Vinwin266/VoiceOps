@@ -20,6 +20,44 @@ class FingerprintRule:
 
 KNOWN_FINGERPRINT_RULES: tuple[FingerprintRule, ...] = (
     FingerprintRule(
+        fingerprint="PROVIDER_WEBHOOK_FAILED",
+        patterns=(
+            MatchPattern("provider webhook failed"),
+            MatchPattern("webhook failed"),
+            MatchPattern(r"(twilio|exotel|provider).*webhook.*(failed|error)", is_regex=True),
+        ),
+        required_terms=("webhook",),
+        phase="provider_webhook",
+        module="telephony_provider",
+        confidence=0.9,
+        runbook_key="PROVIDER_WEBHOOK_FAILED",
+    ),
+    FingerprintRule(
+        fingerprint="SIP_INVITE_FAILED",
+        patterns=(
+            MatchPattern("SIP INVITE failed"),
+            MatchPattern(r"INVITE.*(failed|4\d\d|5\d\d|timeout)", is_regex=True),
+        ),
+        required_terms=("SIP", "INVITE"),
+        phase="sip_invite",
+        module="sip",
+        confidence=0.9,
+        runbook_key="SIP_INVITE_FAILED",
+    ),
+    FingerprintRule(
+        fingerprint="PARTICIPANT_JOIN_TIMEOUT",
+        patterns=(
+            MatchPattern("participant failed to join"),
+            MatchPattern("participant join timeout"),
+            MatchPattern(r"participant.*join.*(timeout|timed out|failed)", is_regex=True),
+        ),
+        required_terms=("participant", "join"),
+        phase="participant_join",
+        module="session_orchestrator",
+        confidence=0.9,
+        runbook_key="PARTICIPANT_JOIN_TIMEOUT",
+    ),
+    FingerprintRule(
         fingerprint="LLM_DEPLOYMENT_NOT_FOUND",
         patterns=(
             MatchPattern("DeploymentNotFound"),
