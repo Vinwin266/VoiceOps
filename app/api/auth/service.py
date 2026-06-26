@@ -1,5 +1,3 @@
-# app/auth/auth.py
-
 import asyncio
 import os
 from datetime import UTC, datetime, timedelta

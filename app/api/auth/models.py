@@ -1,5 +1,3 @@
-# app/auth/models.py
-
 from datetime import UTC, datetime
 
 from pydantic import BaseModel, EmailStr, ConfigDict
@@ -10,8 +8,6 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 class Base(DeclarativeBase):
     pass
 
-##
-# SQLAlchemy DB model
 class User(Base):
     __tablename__ = "users"
 
@@ -36,14 +32,12 @@ class User(Base):
     )
 
 
-# Pydantic request schema
 class UserCreate(BaseModel):
     username: str
     email: EmailStr
     password: str
 
 
-# Pydantic response schema
 class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -54,7 +48,6 @@ class UserRead(BaseModel):
     is_active: bool
 
 
-# Pydantic token response schema
 class Token(BaseModel):
     access_token: str
     token_type: str
