@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.run.model import AgentCreateRunResponse, AgentRunRequest
+from app.agents.run.run import _run_agent
 from app.agents.run.service import create_run, get_run_by_id, list_runs
 from app.api.auth.models import User
 from app.api.auth.service import get_current_active_user
@@ -13,14 +14,17 @@ router = APIRouter(prefix="/agents", tags=["agents"])
 @router.post("/run", response_model=AgentCreateRunResponse)
 async def run_agent(
     agent_run: AgentRunRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await create_run(
+    run = await create_run(
         user_id=current_user.user_id,
         input_text=agent_run.input_text,
         db=db,
     )
+    background_tasks.add_task(_run_agent, run.run_id)
+    return run
 
 
 @router.get("/run/{run_id}", response_model=AgentCreateRunResponse)

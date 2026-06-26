@@ -2,6 +2,9 @@ from sqlalchemy import select, update
 
 from app.agents.run.model import Job
 from app.api.db.session import AsyncSessionLocal
+from app.voiceops.events.normalizer import normalize_logs
+from app.voiceops.fingerprints.matcher import match_fingerprints
+from app.voiceops.rca.report_builder import build_rca_report
 
 
 async def _run_agent(run_id: int) -> dict:
@@ -26,8 +29,10 @@ async def _run_agent(run_id: int) -> dict:
             )
             await db.commit()
 
-            # TODO: later replace this with LangGraph execution
-            agent_result = f"Processed: {job.input_text}"
+            events = normalize_logs(job.input_text, run_id=job.run_id)
+            matches = match_fingerprints(events)
+            rca_report = build_rca_report(events=events, matches=matches)
+            agent_result = rca_report.model_dump_json(indent=2)
 
             await db.execute(
                 update(Job)
