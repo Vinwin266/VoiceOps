@@ -2,6 +2,7 @@ import hashlib
 import re
 
 from app.voiceops.events.model import VoiceOpsEvent
+from app.voiceops.taxonomy import infer_event_taxonomy
 
 
 def normalize_logs(raw_text: str, run_id: int | None = None) -> list[VoiceOpsEvent]:
@@ -12,16 +13,30 @@ def normalize_logs(raw_text: str, run_id: int | None = None) -> list[VoiceOpsEve
     event_messages = _group_multiline_events(lines)
 
     return [
-        VoiceOpsEvent(
-            event_id=_event_id(run_id=run_id, index=index, message=message),
-            run_id=run_id,
-            level=_infer_level(message),
-            error_type=_infer_error_type(message),
-            message_redacted=redact_message(message),
-            raw_message=message,
-        )
+        _build_event(run_id=run_id, index=index, message=message)
         for index, message in enumerate(event_messages, start=1)
     ]
+
+
+def _build_event(
+    run_id: int | None,
+    index: int,
+    message: str,
+) -> VoiceOpsEvent:
+    taxonomy = infer_event_taxonomy(message)
+
+    return VoiceOpsEvent(
+        event_id=_event_id(run_id=run_id, index=index, message=message),
+        run_id=run_id,
+        level=_infer_level(message),
+        module=taxonomy.module,
+        phase=taxonomy.phase,
+        pipeline_node=taxonomy.pipeline_node,
+        taxonomy_confidence=taxonomy.confidence,
+        error_type=_infer_error_type(message),
+        message_redacted=redact_message(message),
+        raw_message=message,
+    )
 
 
 def _group_multiline_events(lines: list[str]) -> list[str]:

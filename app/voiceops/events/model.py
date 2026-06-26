@@ -16,6 +16,7 @@ class VoiceOpsEvent(BaseModel):
     provider: str | None = None
     latency_ms: int | None = None
     error_type: str | None = None
+    taxonomy_confidence: float | None = None
     message_redacted: str
     raw_message: str
     fingerprint: str | None = None
