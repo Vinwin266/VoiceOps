@@ -5,22 +5,91 @@ from app.voiceops.events.model import VoiceOpsEvent
 
 
 def normalize_logs(raw_text: str, run_id: int | None = None) -> list[VoiceOpsEvent]:
-    lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
-    lines =[line.strip() for line in raw_text.split('\n') if line.strip()]
+    lines = [line.rstrip() for line in raw_text.splitlines() if line.strip()]
     if not lines:
         lines = [raw_text.strip()]
 
+    event_messages = _group_multiline_events(lines)
+
     return [
         VoiceOpsEvent(
-            event_id=_event_id(run_id=run_id, index=index, message=line),
+            event_id=_event_id(run_id=run_id, index=index, message=message),
             run_id=run_id,
-            level=_infer_level(line),
-            error_type=_infer_error_type(line),
-            message_redacted=redact_message(line),
-            raw_message=line,
+            level=_infer_level(message),
+            error_type=_infer_error_type(message),
+            message_redacted=redact_message(message),
+            raw_message=message,
         )
-        for index, line in enumerate(lines, start=1)
+        for index, message in enumerate(event_messages, start=1)
     ]
+
+
+def _group_multiline_events(lines: list[str]) -> list[str]:
+    events: list[str] = []
+    index = 0
+
+    while index < len(lines):
+        line = lines[index]
+
+        if _starts_traceback_with_prefix(lines, index):
+            block, index = _consume_traceback(lines, index + 1, prefix=line.strip())
+            events.append(block)
+            continue
+
+        if _is_traceback_start(line):
+            block, index = _consume_traceback(lines, index)
+            events.append(block)
+            continue
+
+        events.append(line.strip())
+        index += 1
+
+    return events
+
+
+def _starts_traceback_with_prefix(lines: list[str], index: int) -> bool:
+    if index + 1 >= len(lines):
+        return False
+    return _looks_like_error_prefix(lines[index]) and _is_traceback_start(lines[index + 1])
+
+
+def _consume_traceback(
+    lines: list[str],
+    start_index: int,
+    prefix: str | None = None,
+) -> tuple[str, int]:
+    block: list[str] = []
+    if prefix is not None:
+        block.append(prefix)
+
+    index = start_index
+    block.append(lines[index])
+    index += 1
+
+    while index < len(lines) and not _starts_new_log_record(lines[index]):
+        block.append(lines[index])
+        index += 1
+
+    return "\n".join(block).strip(), index
+
+
+def _is_traceback_start(line: str) -> bool:
+    return line.lstrip().startswith("Traceback ")
+
+
+def _looks_like_error_prefix(line: str) -> bool:
+    return bool(re.match(r"^\s*(ERROR|CRITICAL)\b", line, re.IGNORECASE))
+
+
+def _starts_new_log_record(line: str) -> bool:
+    stripped = line.lstrip()
+    return bool(
+        re.match(
+            r"^(\d{4}-\d{2}-\d{2}[T\s].*?\b)?(DEBUG|INFO|WARNING|WARN|ERROR|CRITICAL)\b",
+            stripped,
+            re.IGNORECASE,
+        )
+    )
 
 
 def redact_message(message: str) -> str:

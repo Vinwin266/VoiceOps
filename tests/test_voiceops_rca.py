@@ -55,6 +55,30 @@ class VoiceOpsRCATest(unittest.TestCase):
         self.assertEqual(report.confidence, 0.2)
         self.assertEqual(report.evidence, ["caller hung up after a long silence"])
 
+    def test_traceback_lines_are_grouped_into_one_event(self) -> None:
+        raw_log = """
+ERROR llm_node failed
+Traceback (most recent call last):
+  File "/app/voice.py", line 10, in run_turn
+    call_llm()
+  File "/app/llm.py", line 22, in call_llm
+    raise DeploymentNotFound()
+DeploymentNotFound: configured deployment does not exist
+INFO monitor recovered
+"""
+
+        events = normalize_logs(raw_log, run_id=789)
+        matches = match_fingerprints(events)
+        report = build_rca_report(events=events, matches=matches)
+
+        self.assertEqual(len(events), 2)
+        self.assertIn("ERROR llm_node failed", events[0].raw_message)
+        self.assertIn("Traceback (most recent call last):", events[0].raw_message)
+        self.assertIn('  File "/app/voice.py"', events[0].raw_message)
+        self.assertIn("DeploymentNotFound", events[0].raw_message)
+        self.assertEqual(events[1].raw_message, "INFO monitor recovered")
+        self.assertEqual(report.primary_fingerprint, "LLM_DEPLOYMENT_NOT_FOUND")
+
     def test_report_serializes_to_expected_result_contract(self) -> None:
         events = normalize_logs("DeploymentNotFound", run_id=789)
         matches = match_fingerprints(events)
