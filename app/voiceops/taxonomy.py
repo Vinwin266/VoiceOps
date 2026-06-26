@@ -67,7 +67,8 @@ class TaxonomyInference:
 class PhaseInferenceRule:
     phase: str
     module: str
-    terms: tuple[str, ...]
+    required_terms: tuple[str, ...]
+    optional_terms: tuple[str, ...] = ()
     pipeline_node: str | None = None
     confidence: float = 0.45
 
@@ -77,61 +78,70 @@ PHASE_INFERENCE_RULES: tuple[PhaseInferenceRule, ...] = (
         phase="llm",
         module="llm_provider",
         pipeline_node="llm_node",
-        terms=("DeploymentNotFound", "chat.completions", "llm", "model"),
+        required_terms=("DeploymentNotFound", "chat.completions", "llm_node", "llm"),
+        optional_terms=("model", "deployment", "azure", "provider"),
         confidence=0.55,
     ),
     PhaseInferenceRule(
         phase="sip",
         module="telephony_provider",
-        terms=("SIP", "INVITE", "trunk"),
+        required_terms=("SIP", "INVITE"),
+        optional_terms=("trunk", "call_sid", "ACK", "BYE"),
         confidence=0.5,
     ),
     PhaseInferenceRule(
         phase="participant_join",
         module="v1_entrypoint",
         pipeline_node="entrypoint",
-        terms=("participant", "join", "room"),
-        confidence=0.35,
+        required_terms=("participant", "join"),
+        optional_terms=("room", "timeout", "identity"),
+        confidence=0.3,
     ),
     PhaseInferenceRule(
         phase="dispatch",
         module="livekit",
         pipeline_node="dispatch",
-        terms=("agent_dispatch", "create_dispatch", "dispatch"),
+        required_terms=("agent_dispatch", "create_dispatch", "dispatch"),
+        optional_terms=("room", "agent", "livekit"),
         confidence=0.45,
     ),
     PhaseInferenceRule(
         phase="stt",
         module="v1_stt",
         pipeline_node="stt_node",
-        terms=("transcript", "stt", "speech-to-text"),
+        required_terms=("transcript", "stt", "speech-to-text"),
+        optional_terms=("audio", "latency", "provider"),
         confidence=0.45,
     ),
     PhaseInferenceRule(
         phase="tts",
         module="v1_tts",
         pipeline_node="tts_node",
-        terms=("tts", "synthesis", "voice_id"),
+        required_terms=("tts", "synthesis", "voice_id"),
+        optional_terms=("playback", "latency", "provider"),
         confidence=0.45,
     ),
     PhaseInferenceRule(
         phase="monitor",
         module="v1_monitor",
         pipeline_node="monitor",
-        terms=("silence", "prompt", "threshold"),
+        required_terms=("silence", "prompt", "threshold"),
+        optional_terms=("monitor", "timer", "state"),
         confidence=0.45,
     ),
     PhaseInferenceRule(
         phase="tool",
         module="v1_function_tools.py",
         pipeline_node="tool_node",
-        terms=("call_metadata", "tool_name"),
+        required_terms=("call_metadata", "tool_name"),
+        optional_terms=("tool", "metadata", "diff"),
         confidence=0.45,
     ),
     PhaseInferenceRule(
         phase="async_runtime",
         module="async_runtime",
-        terms=("Task exception", "asyncio", "never retrieved"),
+        required_terms=("Task exception", "asyncio", "never retrieved"),
+        optional_terms=("task", "exception"),
         confidence=0.5,
     ),
 )
@@ -142,16 +152,27 @@ def infer_event_taxonomy(message: str) -> TaxonomyInference:
     best_inference = TaxonomyInference()
 
     for rule in PHASE_INFERENCE_RULES:
-        matched_terms = tuple(
+        matched_required_terms = tuple(
             term
-            for term in rule.terms
+            for term in rule.required_terms
             if term.lower() in lowered
         )
-        if not matched_terms:
+        if not matched_required_terms:
             continue
 
+        matched_optional_terms = tuple(
+            term
+            for term in rule.optional_terms
+            if term.lower() in lowered
+        )
+        matched_terms = matched_required_terms + matched_optional_terms
         confidence = round(
-            min(0.8, rule.confidence + (len(matched_terms) - 1) * 0.05),
+            min(
+                0.8,
+                rule.confidence
+                + (len(matched_required_terms) - 1) * 0.05
+                + len(matched_optional_terms) * 0.05,
+            ),
             2,
         )
         if confidence <= best_inference.confidence:

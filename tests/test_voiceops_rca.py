@@ -55,8 +55,20 @@ class VoiceOpsRCATest(unittest.TestCase):
         self.assertEqual(report.phase, "unknown")
         self.assertEqual(report.module, "unknown")
         self.assertEqual(report.confidence, 0.2)
+        self.assertIsNone(report.taxonomy_confidence)
         self.assertEqual(report.evidence, ["unexpected failure with no known terms"])
+        self.assertIsNone(report.primary_event_id)
         self.assertEqual(report.matched_event_ids, [])
+
+    def test_optional_taxonomy_terms_do_not_classify_by_themselves(self) -> None:
+        events = normalize_logs("model response looked unusual", run_id=456)
+        matches = match_fingerprints(events)
+        report = build_rca_report(events=events, matches=matches)
+
+        self.assertEqual(report.primary_fingerprint, "UNKNOWN_VOICEOPS_FAILURE")
+        self.assertEqual(report.phase, "unknown")
+        self.assertEqual(report.module, "unknown")
+        self.assertIsNone(report.taxonomy_confidence)
 
     def test_unknown_classifiable_logs_use_inferred_phase(self) -> None:
         events = normalize_logs("participant failed to join room after timeout", run_id=457)
@@ -67,11 +79,25 @@ class VoiceOpsRCATest(unittest.TestCase):
         self.assertEqual(report.phase, "participant_join")
         self.assertEqual(report.module, "v1_entrypoint")
         self.assertEqual(report.confidence, 0.45)
+        self.assertEqual(report.taxonomy_confidence, 0.45)
+        self.assertEqual(report.primary_event_id, events[0].event_id)
         self.assertEqual(
             report.primary_root_cause,
             "Unknown failure during LiveKit participant join.",
         )
         self.assertIn("room_id", report.recommended_fix)
+        self.assertIn("dispatch_id and room lifecycle logs.", report.next_evidence_needed)
+
+    def test_unknown_llm_logs_use_phase_specific_next_evidence(self) -> None:
+        events = normalize_logs("llm_node timed out waiting for provider response", run_id=458)
+        matches = match_fingerprints(events)
+        report = build_rca_report(events=events, matches=matches)
+
+        self.assertEqual(report.primary_fingerprint, "UNKNOWN_VOICEOPS_FAILURE")
+        self.assertEqual(report.phase, "llm")
+        self.assertEqual(report.module, "llm_provider")
+        self.assertEqual(report.primary_root_cause, "Unknown failure during LLM provider execution.")
+        self.assertIn("model_or_deployment.", report.next_evidence_needed)
 
     def test_traceback_lines_are_grouped_into_one_event(self) -> None:
         raw_log = """
@@ -138,6 +164,8 @@ INFO monitor recovered
         self.assertEqual(payload["suspected_owner"], "llm_provider_config")
         self.assertTrue(payload["next_evidence_needed"])
         self.assertEqual(payload["event_count"], 1)
+        self.assertEqual(payload["primary_event_id"], events[0].event_id)
+        self.assertEqual(payload["taxonomy_confidence"], 0.6)
         self.assertEqual(payload["matched_event_ids"], [events[0].event_id])
         self.assertEqual(payload["matched_fingerprints"], [])
 

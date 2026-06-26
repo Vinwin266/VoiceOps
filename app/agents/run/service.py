@@ -17,21 +17,27 @@ async def create_run(
     db.add(job)
     await db.commit()
     await db.refresh(job)
-    return AgentCreateRunResponse(
-        run_id=job.run_id,
-        user_id=job.user_id,
-        input_text=job.input_text,
-        status=job.status,
-        result=job.result,
-        error=job.error,
+    return _to_run_response(job)
+
+
+async def get_run_for_user(
+    run_id: int,
+    user_id: int,
+    db: AsyncSession,
+) -> AgentCreateRunResponse | None:
+    result = await db.execute(
+        select(Job).where(
+            Job.run_id == run_id,
+            Job.user_id == user_id,
+        )
     )
-
-
-async def get_run_by_id(run_id: int, db: AsyncSession) -> AgentCreateRunResponse | None:
-    result = await db.execute(select(Job).where(Job.run_id == run_id))
     job = result.scalar_one_or_none()
     if job is None:
         return None
+    return _to_run_response(job)
+
+
+def _to_run_response(job: Job) -> AgentCreateRunResponse:
     return AgentCreateRunResponse(
         run_id=job.run_id,
         user_id=job.user_id,
@@ -48,14 +54,4 @@ async def list_runs(user_id: int, db: AsyncSession) -> list[AgentCreateRunRespon
         .where(Job.user_id == user_id)
         .order_by(Job.run_id.desc())
     )
-    return [
-        AgentCreateRunResponse(
-            run_id=job.run_id,
-            user_id=job.user_id,
-            input_text=job.input_text,
-            status=job.status,
-            result=job.result,
-            error=job.error,
-        )
-        for job in result.scalars().all()
-    ]
+    return [_to_run_response(job) for job in result.scalars().all()]

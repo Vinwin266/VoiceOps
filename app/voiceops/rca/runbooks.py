@@ -104,6 +104,43 @@ UNKNOWN_RUNBOOK = Runbook(
 
 
 UNKNOWN_PHASE_RUNBOOKS: dict[str, Runbook] = {
+    "llm": Runbook(
+        primary_root_cause="Unknown failure during LLM provider execution.",
+        recommended_fix="Inspect provider, model or deployment, environment configuration, and provider error body.",
+        verification_plan=(
+            "Run one test call through llm_node.",
+            "Verify the provider accepts the configured model or deployment.",
+            "Confirm downstream TTS is reached after LLM response.",
+        ),
+        summary="Unknown failure appears to be in the LLM phase.",
+        severity="medium",
+        suspected_owner="llm_provider_config",
+        next_evidence_needed=(
+            "provider.",
+            "model_or_deployment.",
+            "env/config snapshot.",
+            "request error body.",
+        ),
+    ),
+    "sip": Runbook(
+        primary_root_cause="Unknown failure during SIP signaling.",
+        recommended_fix="Inspect SIP status, trunk configuration, provider response, and call signaling sequence.",
+        verification_plan=(
+            "Place a synthetic SIP call through the same trunk.",
+            "Verify INVITE/ACK/BYE sequence is present.",
+            "Confirm provider status code and call_sid are captured.",
+        ),
+        summary="Unknown failure appears to be in SIP or telephony signaling.",
+        severity="medium",
+        suspected_owner="telephony_provider",
+        next_evidence_needed=(
+            "SIP status code.",
+            "trunk_id.",
+            "provider response.",
+            "call_sid.",
+            "INVITE/ACK/BYE sequence.",
+        ),
+    ),
     "participant_join": Runbook(
         primary_root_cause="Unknown failure during LiveKit participant join.",
         recommended_fix="Inspect room_id, participant_identity, dispatch_id, and LiveKit room state.",
@@ -119,6 +156,61 @@ UNKNOWN_PHASE_RUNBOOKS: dict[str, Runbook] = {
             "room_id and participant_identity.",
             "dispatch_id and room lifecycle logs.",
             "Join timeout and LiveKit server response.",
+        ),
+    ),
+    "stt": Runbook(
+        primary_root_cause="Unknown failure during speech-to-text processing.",
+        recommended_fix="Inspect STT provider attempts, audio duration, latency, and transcript output.",
+        verification_plan=(
+            "Replay a short audio sample through stt_node.",
+            "Verify transcript is produced within expected latency.",
+            "Check provider attempt logs and error response.",
+        ),
+        summary="Unknown failure appears to be in the STT phase.",
+        severity="medium",
+        suspected_owner="stt_pipeline",
+        next_evidence_needed=(
+            "stt_provider.",
+            "audio_duration_ms.",
+            "attempt_no.",
+            "latency_ms.",
+            "transcript_length.",
+        ),
+    ),
+    "tts": Runbook(
+        primary_root_cause="Unknown failure during text-to-speech synthesis or playback.",
+        recommended_fix="Inspect TTS provider, voice configuration, synthesis latency, and playback lifecycle.",
+        verification_plan=(
+            "Run one known-good text response through tts_node.",
+            "Verify synthesis completes within expected latency.",
+            "Confirm playback_start and playback_end are logged.",
+        ),
+        summary="Unknown failure appears to be in the TTS phase.",
+        severity="medium",
+        suspected_owner="tts_pipeline",
+        next_evidence_needed=(
+            "tts_provider.",
+            "voice_id.",
+            "synthesis_latency_ms.",
+            "playback_start/end.",
+        ),
+    ),
+    "tool": Runbook(
+        primary_root_cause="Unknown failure during tool execution or metadata mutation.",
+        recommended_fix="Inspect tool identity, argument schema, and call_metadata before/after diff.",
+        verification_plan=(
+            "Run the affected tool with the captured arguments.",
+            "Verify output schema and metadata mutation are expected.",
+            "Confirm downstream LLM/TTS path continues after tool completion.",
+        ),
+        summary="Unknown failure appears to be in a tool or metadata mutation path.",
+        severity="medium",
+        suspected_owner="function_tools",
+        next_evidence_needed=(
+            "tool_name.",
+            "tool_class.",
+            "args schema.",
+            "call_metadata before/after diff.",
         ),
     ),
 }

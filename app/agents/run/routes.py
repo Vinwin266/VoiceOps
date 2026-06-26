@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.run.model import AgentCreateRunResponse, AgentRunRequest
 from app.agents.run.run import _run_agent
-from app.agents.run.service import create_run, get_run_by_id, list_runs
+from app.agents.run.service import create_run, get_run_for_user, list_runs
 from app.api.auth.models import User
 from app.api.auth.service import get_current_active_user
 from app.api.db.session import get_db
@@ -33,8 +33,12 @@ async def get_run(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
-    agent_run = await get_run_by_id(run_id=run_id, db=db)
-    if agent_run is None or agent_run.user_id != current_user.user_id:
+    agent_run = await get_run_for_user(
+        run_id=run_id,
+        user_id=current_user.user_id,
+        db=db,
+    )
+    if agent_run is None:
         raise HTTPException(status_code=404, detail="Run not found")
     return agent_run
 

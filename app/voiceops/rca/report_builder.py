@@ -19,6 +19,7 @@ class RCAReport(BaseModel):
     severity: str
     summary: str
     confidence: float
+    taxonomy_confidence: float | None = None
     primary_root_cause: str
     evidence: list[str]
     recommended_fix: str
@@ -26,6 +27,7 @@ class RCAReport(BaseModel):
     suspected_owner: str
     next_evidence_needed: list[str]
     event_count: int
+    primary_event_id: str | None = None
     matched_event_ids: list[str]
     matched_fingerprints: list[str] = Field(default_factory=list)
 
@@ -39,6 +41,7 @@ def build_rca_report(
 
     primary = max(matches, key=lambda match: match.confidence)
     runbook = RUNBOOKS[primary.runbook_key]
+    primary_event = _event_by_id(events=events, event_id=primary.event_id)
     evidence = _unique(
         match.evidence
         for match in matches
@@ -58,6 +61,11 @@ def build_rca_report(
         severity=runbook.severity,
         summary=runbook.summary,
         confidence=primary.confidence,
+        taxonomy_confidence=(
+            primary_event.taxonomy_confidence
+            if primary_event is not None
+            else None
+        ),
         primary_root_cause=runbook.primary_root_cause,
         evidence=evidence,
         recommended_fix=runbook.recommended_fix,
@@ -65,6 +73,7 @@ def build_rca_report(
         suspected_owner=runbook.suspected_owner,
         next_evidence_needed=list(runbook.next_evidence_needed),
         event_count=len(events),
+        primary_event_id=primary.event_id,
         matched_event_ids=matched_event_ids,
         matched_fingerprints=matched_fingerprints,
     )
@@ -96,6 +105,11 @@ def _build_unknown_report(events: list[VoiceOpsEvent]) -> RCAReport:
         if classified_event is not None and classified_event.taxonomy_confidence is not None
         else 0.2
     )
+    taxonomy_confidence = (
+        classified_event.taxonomy_confidence
+        if classified_event is not None
+        else None
+    )
     runbook = UNKNOWN_PHASE_RUNBOOKS.get(phase, UNKNOWN_RUNBOOK)
 
     return RCAReport(
@@ -105,6 +119,7 @@ def _build_unknown_report(events: list[VoiceOpsEvent]) -> RCAReport:
         severity=runbook.severity,
         summary=runbook.summary,
         confidence=confidence,
+        taxonomy_confidence=taxonomy_confidence,
         primary_root_cause=runbook.primary_root_cause,
         evidence=evidence,
         recommended_fix=runbook.recommended_fix,
@@ -112,6 +127,11 @@ def _build_unknown_report(events: list[VoiceOpsEvent]) -> RCAReport:
         suspected_owner=runbook.suspected_owner,
         next_evidence_needed=list(runbook.next_evidence_needed),
         event_count=len(events),
+        primary_event_id=(
+            classified_event.event_id
+            if classified_event is not None
+            else None
+        ),
         matched_event_ids=[],
         matched_fingerprints=[],
     )
@@ -128,6 +148,13 @@ def _best_classified_event(events: list[VoiceOpsEvent]) -> VoiceOpsEvent | None:
     if not classified_events:
         return None
     return max(classified_events, key=lambda event: event.taxonomy_confidence or 0.0)
+
+
+def _event_by_id(events: list[VoiceOpsEvent], event_id: str) -> VoiceOpsEvent | None:
+    for event in events:
+        if event.event_id == event_id:
+            return event
+    return None
 
 
 def _unique(values: Iterable[str]) -> list[str]:
