@@ -1,4 +1,5 @@
-from typing import TypedDict
+import operator
+from typing import Annotated, TypedDict
 
 from app.voiceops.events.model import VoiceOpsEvent
 from app.voiceops.fingerprints.matcher import FingerprintMatch
@@ -12,4 +13,4 @@ class RCAState(TypedDict, total=False):
     events: list[VoiceOpsEvent]
     matches: list[FingerprintMatch]
     report: RCAReport
-    errors: list[str]
+    errors: Annotated[list[str], operator.add]
