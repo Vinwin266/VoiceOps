@@ -47,7 +47,8 @@ def match_fingerprints(
 
     return matches
 
-
+"""_matches_rule checks if the rule matches the haystack.
+"""
 def _matches_rule(rule: FingerprintRule, haystack: str) -> bool:
     lowered = haystack.lower()
     if not all(term.lower() in lowered for term in rule.required_terms):
@@ -55,7 +56,9 @@ def _matches_rule(rule: FingerprintRule, haystack: str) -> bool:
 
     return any(_matches_pattern(pattern, haystack) for pattern in rule.patterns)
 
-
+"""
+_matches_pattern checks if the pattern matches the haystack.
+"""
 def _matches_pattern(pattern: MatchPattern, haystack: str) -> bool:
     if pattern.is_regex:
         return re.search(pattern.value, haystack, re.IGNORECASE) is not None
