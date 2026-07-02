@@ -1,13 +1,13 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.run.model import AgentCreateRunResponse, Job
+from app.agents.run.model import AgentCreateRunResponse, AgentInputFormat, Job
 
 
 async def create_run(
     user_id: int,
     input_text: str,
-    input_format: str,
+    input_format: AgentInputFormat,
     db: AsyncSession,
 ) -> AgentCreateRunResponse:
     job = Job(

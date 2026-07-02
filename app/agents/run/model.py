@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
@@ -7,17 +7,19 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.api.auth.models import Base
 
+AgentInputFormat = Literal["raw_text", "jsonl"]
+
 
 class AgentRunRequest(BaseModel):
     input_text: str
-    input_format: str = "raw_text"  # "raw_text" | "jsonl"
+    input_format: AgentInputFormat = "raw_text"
 
 
 class AgentCreateRunResponse(BaseModel):
     run_id: int
     user_id: int
     input_text: str
-    input_format: str
+    input_format: AgentInputFormat
     status: str
     result: Optional[str] = None
     error: Optional[str] = None

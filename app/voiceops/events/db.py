@@ -4,6 +4,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.api.auth.models import Base
 from app.voiceops.events.model import VoiceOpsEvent
+from app.voiceops.fingerprints.matcher import FingerprintMatch
 
 
 class VoiceOpsEventRow(Base):
@@ -34,9 +35,12 @@ class VoiceOpsEventRow(Base):
 
 async def persist_events(
     events: list[VoiceOpsEvent],
+    matches: list[FingerprintMatch],
     run_id: int,
     db: AsyncSession,
 ) -> None:
+    fingerprints_by_event_id = _best_fingerprints_by_event_id(matches)
+
     for event in events:
         row = VoiceOpsEventRow(
             event_id=event.event_id,
@@ -46,7 +50,7 @@ async def persist_events(
             pipeline_node=event.pipeline_node,
             level=event.level,
             error_type=event.error_type,
-            fingerprint=event.fingerprint,
+            fingerprint=fingerprints_by_event_id.get(event.event_id, event.fingerprint),
             call_sid=event.call_sid,
             room_id=event.room_id,
             agent_id=event.agent_id,
@@ -58,3 +62,19 @@ async def persist_events(
         )
         db.add(row)
     await db.commit()
+
+
+def _best_fingerprints_by_event_id(
+    matches: list[FingerprintMatch],
+) -> dict[str, str]:
+    best_matches: dict[str, FingerprintMatch] = {}
+
+    for match in matches:
+        existing = best_matches.get(match.event_id)
+        if existing is None or match.confidence > existing.confidence:
+            best_matches[match.event_id] = match
+
+    return {
+        event_id: match.fingerprint
+        for event_id, match in best_matches.items()
+    }

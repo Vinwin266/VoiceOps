@@ -44,7 +44,12 @@ async def _run_agent(run_id: int) -> dict:
 
             events = result.get("events") or []
             if events:
-                await persist_events(events=events, run_id=job.run_id, db=db)
+                await persist_events(
+                    events=events,
+                    matches=result.get("matches") or [],
+                    run_id=job.run_id,
+                    db=db,
+                )
 
             agent_result = rca_report.model_dump_json(indent=2)
 

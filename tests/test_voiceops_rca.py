@@ -2,9 +2,13 @@ import json
 import tempfile
 import unittest
 
+from pydantic import ValidationError
+
+from app.agents.run.model import AgentRunRequest
 from app.voiceops.analyzer import analyze_jsonl
+from app.voiceops.events.db import _best_fingerprints_by_event_id
 from app.voiceops.events.normalizer import normalize_logs
-from app.voiceops.fingerprints.matcher import match_fingerprints
+from app.voiceops.fingerprints.matcher import FingerprintMatch, match_fingerprints
 from app.voiceops.graph.graph import run_rca_graph
 from app.voiceops.rca.report_builder import build_rca_report
 from app.voiceops.sinks.jsonl import append_events
@@ -12,6 +16,37 @@ from app.voiceops.sources.jsonl import load_jsonl_events, parse_jsonl_events
 
 
 class VoiceOpsRCATest(unittest.TestCase):
+    def test_agent_run_request_rejects_invalid_input_format(self) -> None:
+        with self.assertRaises(ValidationError):
+            AgentRunRequest(input_text="DeploymentNotFound", input_format="bad")
+
+    def test_event_fingerprint_persistence_prefers_highest_confidence_match(self) -> None:
+        event_id = "evt_test"
+        fingerprints_by_event_id = _best_fingerprints_by_event_id(
+            [
+                FingerprintMatch(
+                    fingerprint="LOW_CONFIDENCE",
+                    runbook_key="LOW_CONFIDENCE",
+                    phase="unknown",
+                    module="unknown",
+                    confidence=0.4,
+                    evidence="low",
+                    event_id=event_id,
+                ),
+                FingerprintMatch(
+                    fingerprint="HIGH_CONFIDENCE",
+                    runbook_key="HIGH_CONFIDENCE",
+                    phase="llm",
+                    module="llm",
+                    confidence=0.9,
+                    evidence="high",
+                    event_id=event_id,
+                ),
+            ]
+        )
+
+        self.assertEqual(fingerprints_by_event_id[event_id], "HIGH_CONFIDENCE")
+
     def test_known_fingerprints_match_expected_phases(self) -> None:
         cases = [
             (
