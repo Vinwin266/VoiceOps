@@ -10,12 +10,14 @@ from app.api.auth.models import Base
 
 class AgentRunRequest(BaseModel):
     input_text: str
+    input_format: str = "raw_text"  # "raw_text" | "jsonl"
 
 
 class AgentCreateRunResponse(BaseModel):
     run_id: int
     user_id: int
     input_text: str
+    input_format: str
     status: str
     result: Optional[str] = None
     error: Optional[str] = None
@@ -32,6 +34,12 @@ class Job(Base):
         nullable=False,
     )
     input_text: Mapped[str] = mapped_column(Text, nullable=False)
+    input_format: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="raw_text",
+        server_default="raw_text",
+    )
     status: Mapped[str] = mapped_column(
         String(50),
         nullable=False,

@@ -7,11 +7,13 @@ from app.agents.run.model import AgentCreateRunResponse, Job
 async def create_run(
     user_id: int,
     input_text: str,
+    input_format: str,
     db: AsyncSession,
 ) -> AgentCreateRunResponse:
     job = Job(
         user_id=user_id,
         input_text=input_text,
+        input_format=input_format,
         status="pending",
     )
     db.add(job)
@@ -42,6 +44,7 @@ def _to_run_response(job: Job) -> AgentCreateRunResponse:
         run_id=job.run_id,
         user_id=job.user_id,
         input_text=job.input_text,
+        input_format=job.input_format,
         status=job.status,
         result=job.result,
         error=job.error,

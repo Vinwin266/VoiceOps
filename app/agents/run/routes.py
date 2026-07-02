@@ -21,6 +21,7 @@ async def run_agent(
     run = await create_run(
         user_id=current_user.user_id,
         input_text=agent_run.input_text,
+        input_format=agent_run.input_format,
         db=db,
     )
     background_tasks.add_task(_run_agent, run.run_id)

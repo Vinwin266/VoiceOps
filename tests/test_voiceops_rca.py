@@ -49,6 +49,31 @@ class VoiceOpsRCATest(unittest.TestCase):
                 "PARTICIPANT_JOIN_TIMEOUT",
                 "participant_join",
             ),
+            (
+                "stt failed: transcript is empty",
+                "STT_FAILURE_OR_LATENCY_SPIKE",
+                "stt",
+            ),
+            (
+                "tts failed: synthesis failed",
+                "TTS_FAILURE_OR_LATENCY_SPIKE",
+                "tts",
+            ),
+            (
+                "room creation failed for room_id=test-room",
+                "LIVEKIT_ROOM_CREATE_FAILED",
+                "room_create",
+            ),
+            (
+                "agent_dispatch failed dispatch_id=d99",
+                "AGENT_DISPATCH_FAILED",
+                "agent_dispatch",
+            ),
+            (
+                "silence monitor triggered during active tts playback",
+                "SILENCE_MONITOR_FALSE_TRIGGER",
+                "monitor",
+            ),
         ]
 
         for raw_log, fingerprint, phase in cases:
@@ -248,6 +273,70 @@ INFO monitor recovered
         self.assertEqual(payload["taxonomy_confidence"], 0.6)
         self.assertEqual(payload["matched_event_ids"], [events[0].event_id])
         self.assertEqual(payload["matched_fingerprints"], [])
+
+
+    def test_stt_failure_matches_fingerprint(self) -> None:
+        events = normalize_logs("stt failed: transcript is empty after 3 attempts", run_id=800)
+        matches = match_fingerprints(events)
+        report = build_rca_report(events=events, matches=matches)
+
+        self.assertEqual(report.primary_fingerprint, "STT_FAILURE_OR_LATENCY_SPIKE")
+        self.assertEqual(report.phase, "stt")
+        self.assertGreaterEqual(report.confidence, 0.9)
+        self.assertTrue(report.evidence)
+        self.assertTrue(report.recommended_fix)
+        self.assertIn("stt_provider.", report.next_evidence_needed)
+
+    def test_tts_failure_matches_fingerprint(self) -> None:
+        events = normalize_logs("tts failed: synthesis failed after timeout", run_id=801)
+        matches = match_fingerprints(events)
+        report = build_rca_report(events=events, matches=matches)
+
+        self.assertEqual(report.primary_fingerprint, "TTS_FAILURE_OR_LATENCY_SPIKE")
+        self.assertEqual(report.phase, "tts")
+        self.assertGreaterEqual(report.confidence, 0.9)
+        self.assertTrue(report.evidence)
+        self.assertTrue(report.recommended_fix)
+        self.assertIn("tts_provider.", report.next_evidence_needed)
+
+    def test_livekit_room_create_failed_matches_fingerprint(self) -> None:
+        events = normalize_logs("room creation failed: LiveKit server rejected request", run_id=802)
+        matches = match_fingerprints(events)
+        report = build_rca_report(events=events, matches=matches)
+
+        self.assertEqual(report.primary_fingerprint, "LIVEKIT_ROOM_CREATE_FAILED")
+        self.assertEqual(report.phase, "room_create")
+        self.assertGreaterEqual(report.confidence, 0.9)
+        self.assertTrue(report.evidence)
+        self.assertTrue(report.recommended_fix)
+        self.assertIn("room_id attempted.", report.next_evidence_needed)
+
+    def test_agent_dispatch_failed_matches_fingerprint(self) -> None:
+        events = normalize_logs("agent_dispatch failed: dispatch timed out room_id=test-room", run_id=803)
+        matches = match_fingerprints(events)
+        report = build_rca_report(events=events, matches=matches)
+
+        self.assertEqual(report.primary_fingerprint, "AGENT_DISPATCH_FAILED")
+        self.assertEqual(report.phase, "agent_dispatch")
+        self.assertGreaterEqual(report.confidence, 0.9)
+        self.assertTrue(report.evidence)
+        self.assertTrue(report.recommended_fix)
+        self.assertIn("dispatch_id.", report.next_evidence_needed)
+
+    def test_silence_monitor_false_trigger_matches_fingerprint(self) -> None:
+        events = normalize_logs(
+            "silence monitor triggered during active tts playback turn_id=t42",
+            run_id=804,
+        )
+        matches = match_fingerprints(events)
+        report = build_rca_report(events=events, matches=matches)
+
+        self.assertEqual(report.primary_fingerprint, "SILENCE_MONITOR_FALSE_TRIGGER")
+        self.assertEqual(report.phase, "monitor")
+        self.assertGreaterEqual(report.confidence, 0.9)
+        self.assertTrue(report.evidence)
+        self.assertTrue(report.recommended_fix)
+        self.assertIn("call_sid and turn_id.", report.next_evidence_needed)
 
 
 if __name__ == "__main__":
